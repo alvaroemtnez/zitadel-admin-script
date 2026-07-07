@@ -82,10 +82,11 @@ while true; do
     echo "------------------------------------------------"
     echo "Select an action:"
     echo "1) Generate Recovery Codes"
-    echo "2) Trigger Password Reset"
-    echo "3) Change Instance Name"
+    echo "2) Delete Recovery Codes"
+    echo "3) Trigger Password Reset"
+    echo "4) Change Instance Name"
     echo "0) Exit"
-    read -p "Action [0-3]: " ACTION
+    read -p "Action [0-4]: " ACTION
 
     case $ACTION in
         1)
@@ -117,12 +118,34 @@ while true; do
             ;;
         2)
             echo ""
+            echo "--- Delete Recovery Codes ---"
+            read -p "Enter the target Username, Email, or User ID: " USER_INPUT
+            resolve_user_id "$USER_INPUT"
+            
+            echo "Deleting existing recovery codes for User ID: $TARGET_USER_ID..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X DELETE "https://${FINAL_DOMAIN}/v2/users/${TARGET_USER_ID}/recovery_codes" \
+                 -H "Authorization: Bearer ${FINAL_PAT}" \
+                 -H "Content-Type: application/json")
+            
+            HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | sed -e 's/HTTP_STATUS://')
+            
+            if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                echo "Success! Recovery codes deleted."
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            else
+                echo "API Call Failed (Status Code: $HTTP_STATUS)"
+                echo "Error Details:"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            fi
+            ;;
+        3)
+            echo ""
             echo "--- Trigger Password Reset ---"
             read -p "Enter the target Username, Email, or User ID: " USER_INPUT
             resolve_user_id "$USER_INPUT"
             
             echo "Triggering password reset email for User ID: $TARGET_USER_ID..."
-            # Using the sendLink object to trigger ZITADEL's default email flow
             RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://${FINAL_DOMAIN}/v2/users/${TARGET_USER_ID}/password_reset" \
                  -H "Authorization: Bearer ${FINAL_PAT}" \
                  -H "Content-Type: application/json" \
@@ -140,7 +163,7 @@ while true; do
                 if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
             fi
             ;;
-        3)
+        4)
             echo ""
             echo "--- Change Instance Name ---"
             read -p "Enter the new Instance Name: " NEW_INSTANCE_NAME
@@ -169,7 +192,7 @@ while true; do
             exit 0
             ;;
         *)
-            echo "Invalid option. Please enter a number between 0 and 3."
+            echo "Invalid option. Please enter a number between 0 and 4."
             ;;
     esac
 done

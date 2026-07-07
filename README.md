@@ -9,6 +9,7 @@ While ZITADEL offers a robust Management Console UI, certain backend administrat
 * **Interactive Menu:** Simple numbered interface for selecting actions.
 * **Automatic ID Resolution:** You can input a user's Email, Username, or raw `user_id`. The script will automatically query the ZITADEL API to resolve the underlying ID.
 * **Generate Recovery Codes:** Quickly generate a specified number of recovery codes (1-50) for a user.
+* **Delete Recovery Codes:** Clear out all existing, stuck, or compromised recovery codes for a specific user to ensure a clean slate.
 * **Trigger Password Resets:** Initiate the default password reset email flow for a target user.
 * **Change Instance Name:** Update the global Instance Name of your ZITADEL installation.
 * **Flexible Configuration:** Pass credentials interactively, via script variables, or securely via environment variables.
@@ -44,16 +45,16 @@ chmod +x zitadel-admin.sh
 You can provide your ZITADEL Domain and Personal Access Token (PAT) in three different ways. The script applies the following order of precedence:
 
 * **Option A: Environment Variables (Recommended for CI/CD or security)**
-  Pass the credentials directly in the terminal execution line.
+Pass the credentials directly in the terminal execution line.
 
 ```bash
 ZITADEL_DOMAIN="your-instance.zitadel.cloud" ZITADEL_PAT="your_secret_token" ./zitadel-admin.sh
 ```
 
 * **Option B: Hardcoded Script Variables**
-  Open `zitadel-admin.sh` in a text editor and populate the `SCRIPT_DOMAIN` and `SCRIPT_PAT` variables at the top of the file.
+Open `zitadel-admin.sh` in a text editor and populate the `SCRIPT_DOMAIN` and `SCRIPT_PAT` variables at the top of the file.
 * **Option C: Interactive Prompts (Default)**
-  Simply run the script. If the domain and token are not found in the environment or the script variables, it will prompt you to enter them securely.
+Simply run the script. If the domain and token are not found in the environment or the script variables, it will prompt you to enter them securely.
 
 ```bash
 ./zitadel-admin.sh
@@ -71,14 +72,21 @@ Generates an array of fallback recovery codes for a user who has lost access to 
 * **Options:** Choose how many codes to generate (between 1 and 50, default is 10).
 * **Output:** A JSON array containing the plain-text codes.
 
-### 2. Trigger Password Reset
+### 2. Delete Recovery Codes
+
+Deletes all currently active or pending recovery codes assigned to the target user. Useful for resolving state errors on older instance versions or clearing compromised codes.
+
+* **Input:** Username, Email, or User ID.
+* **Output:** Success confirmation or error details.
+
+### 3. Trigger Password Reset
 
 Triggers the ZITADEL backend to send a standard password reset email to the target user.
 
 * **Input:** Username, Email, or User ID.
 * **Output:** Success confirmation or error details.
 
-### 3. Change Instance Name
+### 4. Change Instance Name
 
 Updates the top-level identifier of your ZITADEL instance.
 
