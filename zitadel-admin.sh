@@ -85,8 +85,11 @@ while true; do
     echo "2) Delete Recovery Codes"
     echo "3) Trigger Password Reset"
     echo "4) Change Instance Name"
+    echo "5) Get Login Settings"
+    echo "6) Get Hosted Login Translations"
+    echo "7) Set Hosted Login Translations"
     echo "0) Exit"
-    read -p "Action [0-4]: " ACTION
+    read -p "Action [0-7]: " ACTION
 
     case $ACTION in
         1)
@@ -187,12 +190,140 @@ while true; do
                 if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
             fi
             ;;
+        5)
+            echo ""
+            echo "--- Get Login Settings ---"
+            read -p "Select context (1 for Instance, 2 for Organization) [Default: 1]: " CONTEXT_CHOICE
+            CONTEXT_CHOICE=${CONTEXT_CHOICE:-1}
+            
+            if [ "$CONTEXT_CHOICE" -eq 2 ]; then
+                read -p "Enter Organization ID: " ORG_ID
+                PAYLOAD="{ \"organizationId\": \"$ORG_ID\" }"
+            else
+                PAYLOAD="{ \"instance\": true }"
+            fi
+            
+            echo "Fetching Login Settings..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://${FINAL_DOMAIN}/zitadel.settings.v2.SettingsService/GetLoginSettings" \
+                 -H "Authorization: Bearer ${FINAL_PAT}" \
+                 -H "Content-Type: application/json" \
+                 -H "Connect-Protocol-Version: 1" \
+                 -d "$PAYLOAD")
+            
+            HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | sed -e 's/HTTP_STATUS://')
+            
+            if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                echo "Success!"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            else
+                echo "API Call Failed (Status Code: $HTTP_STATUS)"
+                echo "Error Details:"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            fi
+            ;;
+        6)
+            echo ""
+            echo "--- Get Hosted Login Translations ---"
+            read -p "Select Context (1: System, 2: Instance, 3: Organization) [Default: 2]: " CONTEXT_CHOICE
+            CONTEXT_CHOICE=${CONTEXT_CHOICE:-2}
+            
+            if [ "$CONTEXT_CHOICE" -eq 3 ]; then
+                read -p "Enter Organization ID: " ORG_ID
+                CONTEXT_PAYLOAD="\"organizationId\": \"$ORG_ID\""
+            elif [ "$CONTEXT_CHOICE" -eq 1 ]; then
+                CONTEXT_PAYLOAD="\"system\": true"
+            else
+                CONTEXT_PAYLOAD="\"instance\": true"
+            fi
+
+            read -p "Enter Locale (e.g., en, fr-CH): " LOCALE
+            read -p "Ignore Inheritance? (true/false) [Default: false]: " IGNORE_INHERITANCE
+            IGNORE_INHERITANCE=${IGNORE_INHERITANCE:-false}
+            
+            PAYLOAD="{ $CONTEXT_PAYLOAD, \"locale\": \"$LOCALE\", \"ignoreInheritance\": $IGNORE_INHERITANCE }"
+            
+            echo "Fetching Hosted Login Translations for Locale '$LOCALE'..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://${FINAL_DOMAIN}/zitadel.settings.v2.SettingsService/GetHostedLoginTranslation" \
+                 -H "Authorization: Bearer ${FINAL_PAT}" \
+                 -H "Content-Type: application/json" \
+                 -H "Connect-Protocol-Version: 1" \
+                 -d "$PAYLOAD")
+            
+            HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | sed -e 's/HTTP_STATUS://')
+            
+            if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                echo "Success!"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            else
+                echo "API Call Failed (Status Code: $HTTP_STATUS)"
+                echo "Error Details:"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            fi
+            ;;
+        7)
+            echo ""
+            echo "--- Set Hosted Login Translations ---"
+            read -p "Select Context (1: Instance, 2: Organization) [Default: 1]: " CONTEXT_CHOICE
+            CONTEXT_CHOICE=${CONTEXT_CHOICE:-1}
+            
+            if [ "$CONTEXT_CHOICE" -eq 2 ]; then
+                read -p "Enter Organization ID: " ORG_ID
+                CONTEXT_PAYLOAD="\"organizationId\": \"$ORG_ID\""
+            else
+                CONTEXT_PAYLOAD="\"instance\": true"
+            fi
+
+            read -p "Enter Locale (e.g., en, de): " LOCALE
+            
+            # Using read -e allows for tab-completion in the terminal
+            read -e -p "Enter path to the JSON translations file: " FILE_PATH
+            
+            # Check if file exists
+            if [ ! -f "$FILE_PATH" ]; then
+                echo "Error: Cannot find file at '$FILE_PATH'. Please check the path and try again."
+                continue
+            fi
+            
+            # Read the file contents
+            TRANSLATIONS_JSON=$(cat "$FILE_PATH")
+            
+            # Optional: Verify it's valid JSON before sending the request
+            if command -v jq &> /dev/null; then
+                if ! echo "$TRANSLATIONS_JSON" | jq empty > /dev/null 2>&1; then
+                    echo "Error: The file does not contain valid JSON format."
+                    continue
+                fi
+            fi
+            
+            PAYLOAD="{ $CONTEXT_PAYLOAD, \"locale\": \"$LOCALE\", \"translations\": $TRANSLATIONS_JSON }"
+            
+            echo "Setting Hosted Login Translations for Locale '$LOCALE'..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://${FINAL_DOMAIN}/zitadel.settings.v2.SettingsService/SetHostedLoginTranslation" \
+                 -H "Authorization: Bearer ${FINAL_PAT}" \
+                 -H "Content-Type: application/json" \
+                 -H "Connect-Protocol-Version: 1" \
+                 -d "$PAYLOAD")
+            
+            HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | sed -e 's/HTTP_STATUS://')
+            
+            if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+                echo "Success! Translations updated."
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            else
+                echo "API Call Failed (Status Code: $HTTP_STATUS)"
+                echo "Error Details:"
+                if command -v jq &> /dev/null; then echo "$HTTP_BODY" | jq .; else echo "$HTTP_BODY"; fi
+            fi
+            ;;
         0)
             echo "Exiting..."
             exit 0
             ;;
         *)
-            echo "Invalid option. Please enter a number between 0 and 4."
+            echo "Invalid option. Please enter a number between 0 and 7."
             ;;
     esac
 done
